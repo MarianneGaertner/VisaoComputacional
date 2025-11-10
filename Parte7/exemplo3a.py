@@ -1,0 +1,112 @@
+import cv2
+import numpy as np
+from matplotlib import pyplot as plt
+
+# Funções ---------------------------
+def bounding_box(I1):
+    y, x = np.where(I1)
+    ymin = np.min(y)
+    ymax = np.max(y)
+    xmin = np.min(x)
+    xmax = np.max(x)
+
+    p0 = np.array([xmin, ymin])
+    p1 = np.array([xmax, ymax])
+
+    return p0, p1
+
+def mpq(I1, p, q):
+    y, x = np.where(I1)
+
+    mpq = np.float32(np.sum((x**p)*(y**q)))
+
+    return mpq
+
+def centroide(I1):
+    m00 = mpq(I1, 0, 0)
+    m10 = mpq(I1, 1, 0)
+    m01 = mpq(I1, 0, 1)
+    
+    xc = m10/m00
+    yc = m01/m00
+
+    c0 = np.array([xc, yc])
+
+    return c0
+
+def analisaRegioes(I1):
+    infoRegioes = []
+
+    # rotulamento
+    num_elem, I_labels = cv2.connectedComponents(I1)
+
+    for i in np.arange(1, num_elem):
+        # dados dos componentes
+        dados_do_compenente = dict( )
+        # imagem do componente cenectado (região de interesse)
+        I_componente = np.uint8(I_labels == i)*255
+        dados_do_compenente['imagem'] = I_componente
+
+        #bounding box
+        p0, p1 =bounding_box(I_componente)
+        dados_do_compenente['bb_p0'] = p0
+        dados_do_compenente['bb_p1'] = p1
+
+        # area
+        m00 = mpq(I_componente, 0, 0)
+        dados_do_compenente['area'] = m00
+
+        #centroide
+        c0 = centroide(I_componente)
+        dados_do_compenente['centroide'] = c0
+
+        # adiciona o dicionário na lista infoRegioes
+        infoRegioes.append(dados_do_compenente.copy())
+
+    return infoRegioes
+
+def desenha_boundngBoxes(I1, infoRegioes, color, thickness):
+    num_regioes = len(infoRegioes)
+
+    for i in np.arange(0, num_regioes):
+        p0 = infoRegioes[i]['bb_p0']
+        p1 = infoRegioes[i]['bb_p1']
+
+        cv2.rectangle(I1, p0, p1, color, thickness)
+
+    return I1
+
+def desenha_centroide(I1,infoRegioes, color, radius):
+    num_regioes  = len(infoRegioes)
+    for i in np.arange(0, num_regioes):
+        c0 = infoRegioes[i]['centroide']
+        cv2.circle(I1, np.int32(c0), radius, color, -1)
+
+    return I1
+# -----------------------------------------------------
+
+I1 = cv2.imread('./Imagens/formas.png',cv2.IMREAD_GRAYSCALE)
+
+plt.figure()
+plt.imshow(I1,cmap='gray')
+
+
+# extrai caracteristicas de area de casa componente conectado da imagem I1
+infoRegioes = analisaRegioes(I1)
+
+indice = 1
+print('Centroide = ', infoRegioes[indice]['centroide'])
+print('Área = ', infoRegioes[indice]['area'])
+
+# plota bounding boxes
+I2 = cv2.cvtColor(I1, cv2.COLOR_GRAY2BGR)
+color = (255, 128,128)
+thickness = 1
+radius = 2
+
+I2 = desenha_boundngBoxes(I2, infoRegioes, color, thickness)
+I2 = desenha_centroide(I2, infoRegioes, color, radius)
+plt.figure()
+plt.imshow(cv2.cvtColor(I2, cv2.COLOR_BGR2RGB))
+
+plt.show()
